@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Webhook Inspector</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            text-align: center;
+            margin-top: 50px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        input {
+            padding: 5px;
+            font-size: 14px;
+            width: 300px;
+        }
+        #result {
+            margin-top: 20px;
+            text-align: left;
+            display: inline-block;
+        }
+        textarea {
+            width: 400px;
+            height: 80px;
+        }
+    </style>
+</head>
+<body>
+<h1>Webhook Inspector</h1>
+
+<!-- Create Webhook -->
+<p>Create a unique webhook endpoint instantly:</p>
+<button id="createBtn">Create New Webhook</button>
+
+<div id="result"></div>
+
+<!-- Custom Response Form -->
+<div id="customResponseDiv" style="display:none;">
+    <h3>Set Custom Response</h3>
+    <input type="text" id="webhookIdInput" placeholder="Webhook ID">
+    <input type="number" id="statusInput" placeholder="Status Code">
+    <br>
+    <textarea id="bodyInput" placeholder="Response Body"></textarea>
+    <br>
+    <input type="text" id="forwardInput" placeholder="Forward URL (optional)">
+    <br>
+    <button id="setResponseBtn">Set Custom Response</button>
+</div>
+
+<!-- Replay Form -->
+<div id="replayDiv" style="display:none;">
+    <h3>Replay Request</h3>
+    <input type="text" id="reqIdInput" placeholder="Request ID">
+    <button id="replayBtn">Replay Request</button>
+</div>
+
+<script>
+    const resultDiv = document.getElementById('result');
+
+    // Create new webhook
+    document.getElementById('createBtn').addEventListener('click', async () => {
+        try {
+            const response = await fetch('/new');
+            const data = await response.json();
+
+            resultDiv.innerHTML = `
+                <p><strong>Webhook URL:</strong> <a href="${data.webhook_url}">${window.location.origin}${data.webhook_url}</a></p>
+                <p><strong>Dashboard URL:</strong> <a href="${data.dashboard_url}">${window.location.origin}${data.dashboard_url}</a></p>
+            `;
+
+            // Show custom response and replay sections
+            document.getElementById('customResponseDiv').style.display = 'block';
+            document.getElementById('replayDiv').style.display = 'block';
+            document.getElementById('webhookIdInput').value = data.id;
+
+        } catch (err) {
+            console.error(err);
+            alert('Failed to create webhook');
+        }
+    });
+
+    // Set custom response
+    document.getElementById('setResponseBtn').addEventListener('click', async () => {
+        const webhookId = document.getElementById('webhookIdInput').value;
+        const status = document.getElementById('statusInput').value;
+        const body = document.getElementById('bodyInput').value;
+        const forward = document.getElementById('forwardInput').value;
+
+        try {
+            const response = await fetch(`/webhook/${webhookId}/config`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    status_code: status ? parseInt(status) : undefined,
+                    response_body: body || undefined,
+                    forward_url: forward || undefined
+                })
+            });
+
+            if (response.ok) {
+                alert('Custom response set successfully!');
+            } else {
+                alert('Failed to set custom response');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error setting custom response');
+        }
+    });
+
+    // Replay request
+    document.getElementById('replayBtn').addEventListener('click', async () => {
+        const reqId = document.getElementById('reqIdInput').value;
+        if (!reqId) return alert('Enter a request ID');
+
+        try {
+            const response = await fetch(`/replay/${reqId}`, {method: 'POST'});
+            if (response.ok) {
+                alert('Request replayed successfully!');
+            } else {
+                alert('Failed to replay request');
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Error replaying request');
+        }
+    });
+</script>
+</body>
+</html>
