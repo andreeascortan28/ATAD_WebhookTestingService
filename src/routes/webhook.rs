@@ -9,8 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use uuid::Uuid;
 
-use crate::db::AppState;
-use crate::models::{StoredRequest, WebhookConfig};
+use crate::AppState;
+use crate::models::{StoredRequest, WebhookConfig, WebhookEvent};
 use crate::utils;
 use crate::routes::ws;
 
@@ -46,9 +46,9 @@ pub async fn webhook_handler(
     body: Bytes,
 ) -> impl IntoResponse {
     let headers_map = utils::headers_to_map(&headers);
-
     let req_id = Uuid::new_v4().to_string();
 
+    // Create the StoredRequest
     let stored_req = StoredRequest {
         id: req_id.clone(),
         webhook_id: id.clone(),
@@ -59,20 +59,30 @@ pub async fn webhook_handler(
         created_at: chrono::Utc::now().to_rfc3339(),
     };
 
-    if let Err(err) = state.store_request(&stored_req).await {
+    // Save request to the database
+    if let Err(err) = state.db.store_request(&stored_req).await {
         eprintln!("DB store error: {err}");
     }
 
-    ws::broadcast_to_clients(&id, &stored_req).await;
+    // Wrap the request in a WebhookEvent and broadcast
+    let event: WebhookEvent = stored_req.clone().into();
+    if let Err(err) = state.tx.send(event) {
+        eprintln!("Broadcast error: {err}");
+        // Fallback to per-webhook WS broadcast if needed
+        ws::broadcast_to_clients(&id, &stored_req).await;
+    }
 
-    let config = state.get_response_config(&id).await.unwrap_or_default();
+    // Get custom response config
+    let config = state.db.get_response_config(&id).await.unwrap_or_default();
 
+    // Optional forwarding
     if let Some(forward_url) = &config.forward_url {
         if let Err(err) = utils::forward_request(forward_url, &stored_req).await {
             eprintln!("Forwarding error: {err}");
         }
     }
 
+    // Build response
     let status = StatusCode::from_u16(config.status_code.unwrap_or(200))
         .unwrap_or(StatusCode::OK);
 

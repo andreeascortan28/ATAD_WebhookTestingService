@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use sqlx::FromRow;
 
+/// Represents a stored webhook request
 #[derive(Serialize, Deserialize, FromRow, Debug, Clone)]
 pub struct StoredRequest {
     pub id: String,
@@ -32,8 +33,35 @@ impl WebhookConfig {
     }
 }
 
-#[derive(Serialize)]
+/// Represents a newly created webhook
+#[derive(Serialize, Debug, Clone)]
 pub struct NewWebhook {
     pub id: String,
     pub webhook_url: String,
+}
+
+/// Represents an event broadcasted to WebSocket clients
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct WebhookEvent {
+    pub webhook_id: String,
+    pub request_id: String,
+    pub method: String,
+    pub headers: String,
+    pub body: String,
+    pub query: String,
+    pub created_at: String,
+}
+
+impl From<StoredRequest> for WebhookEvent {
+    fn from(req: StoredRequest) -> Self {
+        Self {
+            webhook_id: req.webhook_id,
+            request_id: req.id,
+            method: req.method,
+            headers: req.headers,
+            body: req.body,
+            query: req.query,
+            created_at: req.created_at,
+        }
+    }
 }

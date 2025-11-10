@@ -4,18 +4,18 @@ use chrono::Utc;
 use std::{fs::OpenOptions, path::PathBuf};
 use crate::models::{StoredRequest, WebhookConfig};
 
+/// Represents the database connection layer.
 #[derive(Clone)]
-pub struct AppState {
+pub struct Database {
     pub pool: SqlitePool,
 }
 
-pub async fn init_db() -> Result<AppState> {
-    // Get absolute path to the DB in the current directory
+/// Initialize the SQLite database and return a Database instance.
+pub async fn init_db() -> Result<Database> {
     let mut db_path: PathBuf = std::env::current_dir()?;
     db_path.push("webhooks.db");
     println!("Using database path: {}", db_path.display());
 
-    // Ensure file exists (creates empty file if needed)
     if !db_path.exists() {
         OpenOptions::new()
             .write(true)
@@ -24,12 +24,9 @@ pub async fn init_db() -> Result<AppState> {
     }
 
     let db_url = format!("sqlite://{}", db_path.to_string_lossy());
-
     let pool = SqlitePool::connect(&db_url).await?;
 
-    sqlx::query("PRAGMA foreign_keys = ON;")
-        .execute(&pool)
-        .await?;
+    sqlx::query("PRAGMA foreign_keys = ON;").execute(&pool).await?;
 
     sqlx::query(
         r#"
@@ -42,7 +39,7 @@ pub async fn init_db() -> Result<AppState> {
             query TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
-        "#,
+        "#
     ).execute(&pool).await?;
 
     sqlx::query(
@@ -51,7 +48,7 @@ pub async fn init_db() -> Result<AppState> {
             id TEXT PRIMARY KEY,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )
-        "#,
+        "#
     ).execute(&pool).await?;
 
     sqlx::query(
@@ -62,18 +59,16 @@ pub async fn init_db() -> Result<AppState> {
             response_body TEXT,
             forward_url TEXT
         )
-        "#,
+        "#
     ).execute(&pool).await?;
 
-    Ok(AppState { pool })
+    Ok(Database { pool })
 }
 
-impl AppState {
-    /// Insert new webhook UUID
+impl Database {
+    /// Insert a new webhook UUID.
     pub async fn create_webhook(&self, id: &str) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "INSERT INTO webhooks (id, created_at) VALUES (?, ?)"
-        )
+        sqlx::query("INSERT INTO webhooks (id, created_at) VALUES (?, ?)")
             .bind(id)
             .bind(Utc::now().to_rfc3339())
             .execute(&self.pool)
@@ -81,7 +76,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Store a webhook request
+    /// Store a webhook request.
     pub async fn store_request(&self, req: &StoredRequest) -> Result<(), sqlx::Error> {
         sqlx::query(
             "INSERT INTO requests (id, webhook_id, method, headers, body, query, created_at)
@@ -99,7 +94,18 @@ impl AppState {
         Ok(())
     }
 
-    /// Save or update custom response
+    /// Retrieve a stored request by ID.
+    pub async fn get_request(&self, req_id: &str) -> Result<StoredRequest, sqlx::Error> {
+        sqlx::query_as::<_, StoredRequest>(
+            "SELECT id, webhook_id, method, headers, body, query, created_at
+             FROM requests WHERE id = ?1"
+        )
+            .bind(req_id)
+            .fetch_one(&self.pool)
+            .await
+    }
+
+    /// Save or update a custom response configuration.
     pub async fn set_response_config(&self, config: &WebhookConfig) -> Result<(), sqlx::Error> {
         sqlx::query(
             "INSERT INTO webhook_configs (webhook_id, status_code, response_body, forward_url)
@@ -118,7 +124,7 @@ impl AppState {
         Ok(())
     }
 
-    /// Retrieve custom response
+    /// Retrieve a webhook's custom response configuration.
     pub async fn get_response_config(&self, webhook_id: &str) -> Result<WebhookConfig, sqlx::Error> {
         let config = sqlx::query_as::<_, WebhookConfig>(
             "SELECT webhook_id, status_code, response_body, forward_url
@@ -127,6 +133,7 @@ impl AppState {
             .bind(webhook_id)
             .fetch_optional(&self.pool)
             .await?;
+
         Ok(config.unwrap_or_default())
     }
 }

@@ -1,37 +1,60 @@
 use axum::{extract::{Path, State}, Json};
 use serde_json::json;
-use reqwest::Client;
-use crate::{db::AppState, models::StoredRequest};
+use reqwest::{Client, header::{HeaderMap, HeaderName, HeaderValue}};
 use std::sync::Arc;
+use std::collections::HashMap;
+
+use crate::{AppState, models::StoredRequest};
+
+#[derive(serde::Deserialize)]
+pub struct ReplayPayload {
+    target: String,
+}
 
 pub async fn replay_request(
-    Path(req_id): Path<i64>,
+    Path(req_id): Path<String>,
     State(state): State<Arc<AppState>>,
-    Json(payload): Json<serde_json::Value>,
+    Json(payload): Json<ReplayPayload>,
 ) -> Json<serde_json::Value> {
-    let target_url = payload["target"].as_str().unwrap_or("");
+    let target_url = &payload.target;
     if target_url.is_empty() {
         return Json(json!({"error": "Missing target URL"}));
     }
 
-    if let Ok(req) = sqlx::query_as::<_, StoredRequest>(
-        "SELECT * FROM requests WHERE id = ?1"
-    )
-        .bind(req_id)
-        .fetch_one(&state.pool)
-        .await
-    {
-        let client = Client::new();
-        let res = client.post(target_url)
-            .body(req.body.clone())
-            .send()
-            .await;
+    // Fetch the stored request
+    let stored_req_result = state.db.get_request(&req_id).await;
+    let stored_req: StoredRequest = match stored_req_result {
+        Ok(req) => req,
+        Err(_) => return Json(json!({"error": "Request not found"})),
+    };
 
-        match res {
-            Ok(_) => Json(json!({"status": "ok"})),
-            Err(e) => Json(json!({"error": e.to_string()})),
+    // Convert headers JSON string -> HashMap -> HeaderMap
+    let mut headers = HeaderMap::new();
+    if let Ok(map) = serde_json::from_str::<HashMap<String, String>>(&stored_req.headers) {
+        for (key, value) in map {
+            if let Ok(name) = key.parse::<HeaderName>() {
+                if let Ok(header_value) = value.parse::<HeaderValue>() {
+                    headers.insert(name, header_value);
+                }
+                // else: skip invalid header value
+            }
+            // else: skip invalid header name
         }
-    } else {
-        Json(json!({"error": "Request not found"}))
+    }
+
+    // Send the request
+    let client = Client::new();
+    let res = client.post(target_url)
+        .headers(headers)
+        .body(stored_req.body.clone())
+        .send()
+        .await;
+
+    match res {
+        Ok(resp) => Json(json!({
+            "status": "ok",
+            "status_code": resp.status().as_u16()
+        })),
+        Err(e) => Json(json!({"error": e.to_string()})),
     }
 }
