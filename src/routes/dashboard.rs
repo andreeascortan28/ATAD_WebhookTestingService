@@ -66,7 +66,7 @@ pub async fn dashboard_handler(
                     const requestsDiv = document.getElementById("requests");
 
                     if (!requestsDiv) {{
-                        console.error("⚠️ Requests container not found!");
+                        console.error("Requests container not found!");
                         return;
                     }}
 
@@ -111,13 +111,13 @@ pub async fn dashboard_handler(
                     }}
 
                     initialRequests.forEach(renderRequest);
-                    console.log("✅ Rendered initial requests:", initialRequests);
+                    console.log("Rendered initial requests:", initialRequests);
 
                     const wsUrl = `${{location.origin.replace(/^http/, "ws")}}/ws/${{WEBHOOK_ID}}`;
                     const ws = new WebSocket(wsUrl);
 
                     ws.onopen = () => {{
-                        console.log("✅ Connected to WebSocket");
+                        console.log("Connected to WebSocket");
                         showStatus("Connected", "green");
                     }};
 
@@ -133,7 +133,7 @@ pub async fn dashboard_handler(
                     }};
 
                     ws.onclose = () => {{
-                        console.warn("⚠️ WebSocket disconnected");
+                        console.warn("WebSocket disconnected");
                         showStatus("Disconnected — reconnecting...", "red");
                         setTimeout(() => location.reload(), 3000);
                     }};

@@ -30,19 +30,13 @@ pub fn headers_to_map(headers: &HeaderMap) -> HashMap<String, String> {
 /// Forward the webhook request to another URL
 pub async fn forward_request(forward_url: &str, req: &StoredRequest) -> Result<(), reqwest::Error> {
     let client = Client::new();
-
-    // Convert headers JSON string back to HashMap
     let headers: HashMap<String, String> = serde_json::from_str(&req.headers).unwrap_or_default();
-
-    // Start building request
     let mut request_builder = client.post(forward_url).body(req.body.clone());
 
-    // Add headers
     for (key, value) in headers {
         request_builder = request_builder.header(&key, &value);
     }
 
-    // Send request
     let _res = request_builder.send().await?;
 
     Ok(())
