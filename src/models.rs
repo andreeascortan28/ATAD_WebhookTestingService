@@ -19,6 +19,7 @@ pub struct WebhookConfig {
     pub webhook_id: String,
     pub status_code: Option<u16>,
     pub response_body: Option<String>,
+    pub content_type: Option<String>,
     pub forward_url: Option<String>,
 }
 
@@ -28,6 +29,7 @@ impl WebhookConfig {
             webhook_id: "".to_string(),
             status_code: Some(200),
             response_body: Some("OK".to_string()),
+            content_type: Some("text/plain".to_string()),
             forward_url: None,
         }
     }

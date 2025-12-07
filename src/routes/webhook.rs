@@ -1,10 +1,10 @@
 use axum::{
     extract::{Path, State, Query},
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     Json,
 };
 use axum::body::Bytes;
-use axum::http::StatusCode;
+use axum::http::{StatusCode, HeaderValue};
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use uuid::Uuid;
@@ -44,7 +44,7 @@ pub async fn webhook_handler(
     Query(query): Query<HashMap<String, String>>,
     headers: axum::http::HeaderMap,
     body: Bytes,
-) -> impl IntoResponse {
+) -> Response {
     let headers_map = utils::headers_to_map(&headers);
     let req_id = Uuid::new_v4().to_string();
 
@@ -72,7 +72,7 @@ pub async fn webhook_handler(
         ws::broadcast_to_clients(&id, &stored_req).await;
     }
 
-    // Get custom response config
+    // Get custom response config (using Default if not found)
     let config = state.db.get_response_config(&id).await.unwrap_or_default();
 
     // Optional forwarding
@@ -82,17 +82,24 @@ pub async fn webhook_handler(
         }
     }
 
-    // Build response
     let status = StatusCode::from_u16(config.status_code.unwrap_or(200))
         .unwrap_or(StatusCode::OK);
 
-    (status, config.response_body.unwrap_or_else(|| "OK".to_string()))
+    let content_type = config.content_type.unwrap_or_else(|| "text/plain".to_string());
+    let body_content = config.response_body.unwrap_or_else(|| "OK".to_string());
+
+    Response::builder()
+        .status(status)
+        .header("Content-Type", content_type)
+        .body(axum::body::Body::from(body_content))
+        .unwrap()
 }
 
 #[derive(Deserialize)]
 pub struct CustomResponsePayload {
     status_code: Option<u16>,
     response_body: Option<String>,
+    content_type: Option<String>, // Added field
     forward_url: Option<String>,
 }
 
@@ -105,6 +112,7 @@ pub async fn set_custom_response(
         webhook_id: id.clone(),
         status_code: payload.status_code,
         response_body: payload.response_body,
+        content_type: payload.content_type,
         forward_url: payload.forward_url,
     };
 

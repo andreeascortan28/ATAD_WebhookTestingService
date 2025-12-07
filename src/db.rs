@@ -57,6 +57,7 @@ pub async fn init_db() -> Result<Database> {
             webhook_id TEXT PRIMARY KEY,
             status_code INTEGER,
             response_body TEXT,
+            content_type TEXT,
             forward_url TEXT
         )
         "#
@@ -108,16 +109,18 @@ impl Database {
     /// Save or update a custom response configuration.
     pub async fn set_response_config(&self, config: &WebhookConfig) -> Result<(), sqlx::Error> {
         sqlx::query(
-            "INSERT INTO webhook_configs (webhook_id, status_code, response_body, forward_url)
-             VALUES (?, ?, ?, ?)
+            "INSERT INTO webhook_configs (webhook_id, status_code, response_body, content_type, forward_url)
+             VALUES (?, ?, ?, ?, ?)
              ON CONFLICT(webhook_id) DO UPDATE SET
                  status_code = excluded.status_code,
                  response_body = excluded.response_body,
+                 content_type = excluded.content_type,
                  forward_url = excluded.forward_url"
         )
             .bind(&config.webhook_id)
             .bind(config.status_code)
             .bind(&config.response_body)
+            .bind(&config.content_type)
             .bind(&config.forward_url)
             .execute(&self.pool)
             .await?;
@@ -127,7 +130,7 @@ impl Database {
     /// Retrieve a webhook's custom response configuration.
     pub async fn get_response_config(&self, webhook_id: &str) -> Result<WebhookConfig, sqlx::Error> {
         let config = sqlx::query_as::<_, WebhookConfig>(
-            "SELECT webhook_id, status_code, response_body, forward_url
+            "SELECT webhook_id, status_code, response_body, content_type, forward_url
              FROM webhook_configs WHERE webhook_id = ?"
         )
             .bind(webhook_id)
@@ -144,6 +147,7 @@ impl Default for WebhookConfig {
             webhook_id: "".to_string(),
             status_code: Some(200),
             response_body: Some("OK".to_string()),
+            content_type: Some("text/plain".to_string()),
             forward_url: None,
         }
     }
