@@ -3,81 +3,63 @@
 <head>
     <meta charset="UTF-8">
     <title>Webhook Inspector</title>
-    <style>
-        body {
-            font-family: sans-serif;
-            text-align: center;
-            margin-top: 50px;
-        }
-        button {
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        input, select {
-            padding: 5px;
-            font-size: 14px;
-            width: 300px;
-            margin-bottom: 5px;
-            box-sizing: border-box;
-        }
-        #result {
-            margin-top: 20px;
-            text-align: left;
-            display: inline-block;
-        }
-        textarea {
-            width: 400px;
-            height: 80px;
-            margin-bottom: 5px;
-        }
-        .container {
-            border: 1px solid #ccc;
-            padding: 20px;
-            margin: 20px auto;
-            max-width: 500px;
-            border-radius: 8px;
-            background-color: #f9f9f9;
-        }
-    </style>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-<h1>Webhook Inspector</h1>
+<body class="bg-gray-50 min-h-screen text-gray-800 font-sans">
 
-<p>Create a unique webhook endpoint instantly:</p>
-<button id="createBtn">Create New Webhook</button>
+<div class="max-w-3xl mx-auto py-10 px-4">
 
-<div id="result"></div>
+    <h1 class="text-4xl font-bold mb-6 text-center">Webhook Inspector</h1>
 
-<div id="customResponseDiv" class="container" style="display:none;">
-    <h3>Set Custom Response</h3>
-    <input type="text" id="webhookIdInput" placeholder="Webhook ID" readonly>
-    <br>
+    <!-- Create Webhook -->
+    <div class="bg-white shadow rounded-lg p-6 mb-6">
+        <p class="mb-4">Create a unique webhook endpoint instantly:</p>
+        <button id="createBtn" class="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+            Create New Webhook
+        </button>
+    </div>
 
-    <input type="number" id="statusInput" placeholder="Status Code">
-    <br>
+    <!-- Result display -->
+    <div id="result" class="mb-6"></div>
 
-    <select id="contentTypeInput">
-        <option value="text/plain">text/plain</option>
-        <option value="application/json">application/json</option>
-        <option value="application/xml">application/xml</option>
-        <option value="text/html">text/html</option>
-    </select>
-    <br>
+    <!-- Custom Response Section -->
+    <div id="customResponseDiv" class="bg-white shadow rounded-lg p-6 mb-6 hidden">
+        <h2 class="text-2xl font-semibold mb-4">Set Custom Response</h2>
+        <div class="space-y-3">
+            <input type="text" id="webhookIdInput" placeholder="Webhook ID"
+                   class="w-full px-3 py-2 border rounded">
+            <input type="number" id="statusInput" placeholder="Status Code"
+                   class="w-full px-3 py-2 border rounded">
+            <select id="contentTypeInput" class="w-full px-3 py-2 border rounded">
+                <option value="text/plain">text/plain</option>
+                <option value="application/json">application/json</option>
+                <option value="application/xml">application/xml</option>
+                <option value="text/html">text/html</option>
+            </select>
+            <textarea id="bodyInput" placeholder="Response Body"
+                      class="w-full px-3 py-2 border rounded h-24"></textarea>
+            <input type="text" id="forwardInput" placeholder="Forward URL (optional)"
+                   class="w-full px-3 py-2 border rounded">
+            <button id="setResponseBtn"
+                    class="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                Save Configuration
+            </button>
+        </div>
+    </div>
 
-    <textarea id="bodyInput" placeholder="Response Body"></textarea>
-    <br>
-    <input type="text" id="forwardInput" placeholder="Forward URL (optional)">
-    <br>
-    <button id="setResponseBtn">Save Configuration</button>
-</div>
+    <!-- Replay Section -->
+    <div id="replayDiv" class="bg-white shadow rounded-lg p-6 mb-6 hidden">
+        <h2 class="text-2xl font-semibold mb-4">Replay Request</h2>
+        <div class="flex gap-2">
+            <input type="text" id="reqIdInput" placeholder="Request ID"
+                   class="flex-1 px-3 py-2 border rounded">
+            <button id="replayBtn" class="bg-indigo-500 text-white px-4 py-2 rounded hover:bg-indigo-600">
+                Replay
+            </button>
+        </div>
+    </div>
 
-<div id="replayDiv" class="container" style="display:none;">
-    <h3>Replay Request</h3>
-    <input type="text" id="reqIdInput" placeholder="Request ID">
-    <br>
-    <button id="replayBtn">Replay Request</button>
 </div>
 
 <script>
@@ -90,17 +72,21 @@
             const data = await response.json();
 
             resultDiv.innerHTML = `
-                <div class="container">
-                    <p><strong>Webhook URL:</strong><br>
-                    <a href="${data.webhook_url}" target="_blank">${window.location.origin}${data.webhook_url}</a></p>
-                    <p><strong>Dashboard URL:</strong><br>
-                    <a href="${data.dashboard_url}" target="_blank">${window.location.origin}${data.dashboard_url}</a></p>
-                </div>
-            `;
+            <div class="bg-white shadow rounded-lg p-4 space-y-2">
+                <p><strong>Webhook URL:</strong><br>
+                <a href="${window.location.origin}${data.webhook_url}" target="_blank" class="text-blue-600 underline">
+                    ${window.location.origin}${data.webhook_url}
+                </a></p>
+                <p><strong>Dashboard URL:</strong><br>
+                <a href="${window.location.origin}${data.dashboard_url}" target="_blank" class="text-blue-600 underline">
+                    ${window.location.origin}${data.dashboard_url}
+                </a></p>
+            </div>
+        `;
 
             // Show custom response and replay sections
-            document.getElementById('customResponseDiv').style.display = 'block';
-            document.getElementById('replayDiv').style.display = 'block';
+            document.getElementById('customResponseDiv').classList.remove('hidden');
+            document.getElementById('replayDiv').classList.remove('hidden');
             document.getElementById('webhookIdInput').value = data.id;
 
         } catch (err) {
@@ -148,7 +134,7 @@
         if (!reqId) return alert('Enter a request ID');
 
         try {
-            const response = await fetch(`/replay/${reqId}`, {method: 'POST'});
+            const response = await fetch(`/replay/${reqId}`, {method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: "" }) });
             if (response.ok) {
                 alert('Request replayed successfully!');
             } else {
@@ -160,5 +146,6 @@
         }
     });
 </script>
+
 </body>
 </html>

@@ -6,8 +6,8 @@ use std::sync::Arc;
 use crate::{AppState, models::StoredRequest};
 use serde_json;
 
+/// Helper to fetch all requests for a given webhook.
 impl AppState {
-    /// Helper to fetch all requests for a given webhook.
     pub async fn get_requests(&self, webhook_id: &str) -> Vec<StoredRequest> {
         sqlx::query_as::<_, StoredRequest>(
             "SELECT * FROM requests WHERE webhook_id = ?1 ORDER BY created_at DESC",
@@ -19,142 +19,142 @@ impl AppState {
     }
 }
 
+/// Dashboard handler
 pub async fn dashboard_handler(
     Path(id): Path<String>,
     State(state): State<Arc<AppState>>,
 ) -> impl IntoResponse {
-    // Fetch existing requests for this webhook
+    // Fetch stored requests
     let requests = state.get_requests(&id).await;
+    let requests_json = serde_json::to_string(&requests).unwrap_or_else(|_| "[]".to_string());
 
-    println!(
-        "[DASHBOARD] Requested dashboard for webhook_id = {} ({} requests found)",
-        id,
-        requests.len()
-    );
-
-    for r in &requests {
-        println!("    -> Found request ID: {} (method: {})", r.id, r.method);
-    }
-
-    let requests_json = serde_json::to_string(&requests).unwrap_or("[]".to_string());
-
+    // Render HTML
     let html = format!(
-        r#"
-        <!DOCTYPE html>
-        <html lang="en">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Webhook Dashboard</title>
-            <script src="https://cdn.tailwindcss.com"></script>
-        </head>
-        <body class="bg-gray-50 text-gray-800 min-h-screen">
-            <div class="max-w-5xl mx-auto py-8 px-4">
-                <h1 class="text-3xl font-bold mb-2">Webhook Dashboard</h1>
-                <p class="text-sm text-gray-500 mb-6">Webhook ID: <code class="bg-gray-200 px-1 rounded">{id}</code></p>
+        r#"<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Webhook Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen text-gray-800">
+<div class="max-w-6xl mx-auto px-4 py-6">
+    <h1 class="text-3xl font-bold mb-1">Webhook Dashboard</h1>
+    <p class="text-sm text-gray-500 mb-4">
+        Webhook ID: <code class="bg-gray-200 px-2 py-1 rounded">{id}</code>
+    </p>
 
-                <div class="border-t border-gray-300 my-4"></div>
-                <div id="requests" class="flex flex-col-reverse gap-4 overflow-y-auto max-h-[70vh]"></div>
-            </div>
+    <div class="flex items-center justify-between mb-4">
+        <p class="text-sm">
+            Total requests: <span id="count" class="font-semibold">0</span>
+        </p>
+        <span id="ws-status" class="text-xs px-2 py-1 rounded bg-gray-300 text-gray-700">
+            Connecting…
+        </span>
+    </div>
 
-            <script>
-                const WEBHOOK_ID = "{id}";
-                const INITIAL_REQUESTS = {requests_json};
-                console.log("Loaded INITIAL_REQUESTS:", INITIAL_REQUESTS);
+    <div id="requests" class="flex flex-col gap-4"></div>
+</div>
 
-                document.addEventListener("DOMContentLoaded", () => {{
-                    const requestsDiv = document.getElementById("requests");
+<script>
+const WEBHOOK_ID = "{id}";
+const INITIAL_REQUESTS = {requests_json};
+const container = document.getElementById("requests");
+const countEl = document.getElementById("count");
+const statusEl = document.getElementById("ws-status");
 
-                    if (!requestsDiv) {{
-                        console.error("Requests container not found!");
-                        return;
-                    }}
+function updateCount() {{
+    countEl.textContent = container.children.length;
+}}
 
-                    let initialRequests = INITIAL_REQUESTS;
-                    if (typeof INITIAL_REQUESTS === "string") {{
-                        try {{
-                            initialRequests = JSON.parse(INITIAL_REQUESTS);
-                        }} catch (err) {{
-                            console.error("Error parsing INITIAL_REQUESTS:", err);
-                            initialRequests = [];
-                        }}
-                    }}
+function replayRequest(id) {{
+    fetch(`/replay/${{id}}`, {{ method: 'POST', headers: {{ 'Content-Type': 'application/json' }}, body: JSON.stringify({{ target: "" }}) }})
+        .then(res => {{
+            if(res.ok) console.log("Request replayed:", id);
+            else console.error("Failed to replay request:", id);
+        }})
+        .catch(err => console.error("Replay error:", err));
+}}
 
-                    function renderRequest(req) {{
-                        const el = document.createElement("div");
-                        el.className = "req border border-gray-300 bg-white shadow-sm rounded-lg p-4 text-sm font-mono whitespace-pre-wrap break-words";
+function renderRequest(req, highlight=false) {{
+    const el = document.createElement("div");
+    el.className = "bg-white border rounded shadow-sm p-4 text-sm font-mono";
 
-                        el.innerHTML = `
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-xs text-gray-500">ID: ${{req.id}}</span>
-                                <span class="text-xs text-gray-400">${{new Date(req.created_at).toLocaleString()}}</span>
-                            </div>
-                            <div class="mb-2">
-                                <span class="text-blue-600 font-semibold">${{req.method}}</span>
-                                <span class="text-gray-600 ml-2">Webhook: ${{req.webhook_id}}</span>
-                            </div>
-                            <details class="mb-1">
-                                <summary class="cursor-pointer text-gray-700 font-medium">Headers</summary>
-                                <pre class="bg-gray-100 p-2 rounded mt-1">${{req.headers}}</pre>
-                            </details>
-                            <details class="mb-1">
-                                <summary class="cursor-pointer text-gray-700 font-medium">Query</summary>
-                                <pre class="bg-gray-100 p-2 rounded mt-1">${{req.query}}</pre>
-                            </details>
-                            <details open>
-                                <summary class="cursor-pointer text-gray-700 font-medium">Body</summary>
-                                <pre class="bg-gray-100 p-2 rounded mt-1">${{req.body}}</pre>
-                            </details>
-                        `;
+    if (highlight) {{
+        el.classList.add("ring", "ring-blue-400");
+        setTimeout(() => el.classList.remove("ring", "ring-blue-400"), 1200);
+    }}
 
-                        requestsDiv.prepend(el);
-                    }}
+    el.innerHTML = `
+        <div class="flex justify-between items-center mb-2">
+            <span class="text-xs text-gray-500 break-all">ID: \${{req.id}}</span>
+            <button
+                class="text-xs text-blue-600 underline"
+                onclick="replayRequest('\${{req.id}}')">
+                Replay
+            </button>
+        </div>
+        <div class="text-xs text-gray-400 mb-2">\${{new Date(req.created_at).toLocaleString()}}</div>
 
-                    initialRequests.forEach(renderRequest);
-                    console.log("Rendered initial requests:", initialRequests);
+        <details class="mb-1">
+            <summary class="cursor-pointer font-semibold text-gray-700">Headers</summary>
+            <pre class="bg-gray-100 p-2 mt-1 rounded"></pre>
+        </details>
 
-                    const wsUrl = `${{location.origin.replace(/^http/, "ws")}}/ws/${{WEBHOOK_ID}}`;
-                    const ws = new WebSocket(wsUrl);
+        <details class="mb-1">
+            <summary class="cursor-pointer font-semibold text-gray-700">Query</summary>
+            <pre class="bg-gray-100 p-2 mt-1 rounded"></pre>
+        </details>
 
-                    ws.onopen = () => {{
-                        console.log("Connected to WebSocket");
-                        showStatus("Connected", "green");
-                    }};
+        <details open>
+            <summary class="cursor-pointer font-semibold text-gray-700">Body</summary>
+            <pre class="bg-gray-100 p-2 mt-1 rounded"></pre>
+        </details>
+    `;
 
-                    ws.onmessage = (event) => {{
-                        try {{
-                            const data = JSON.parse(event.data);
-                            if (data.status) return;
-                            renderRequest(data);
-                            showStatus("New request received", "blue");
-                        }} catch (err) {{
-                            console.error("Error parsing WS message:", err);
-                        }}
-                    }};
+    // XSS-safe rendering
+    const pres = el.querySelectorAll("pre");
+    pres[0].textContent = req.headers || "";
+    pres[1].textContent = req.query || "";
+    pres[2].textContent = req.body || "";
 
-                    ws.onclose = () => {{
-                        console.warn("WebSocket disconnected");
-                        showStatus("Disconnected — reconnecting...", "red");
-                        setTimeout(() => location.reload(), 3000);
-                    }};
+    container.prepend(el);
+    updateCount();
+}};
 
-                    function showStatus(msg, color) {{
-                        let bar = document.getElementById("status-bar");
-                        if (!bar) {{
-                            bar = document.createElement("div");
-                            bar.id = "status-bar";
-                            bar.className = "fixed top-2 right-2 px-3 py-1 rounded text-white text-sm shadow";
-                            document.body.appendChild(bar);
-                        }}
-                        bar.textContent = msg;
-                        bar.className = `fixed top-2 right-2 px-3 py-1 rounded text-white text-sm shadow bg-${{color}}-500`;
-                        setTimeout(() => (bar.style.opacity = 0.8), 100);
-                    }}
-                }});
-            </script>
-        </body>
-        </html>
-        "#,
+// Render initial requests
+INITIAL_REQUESTS.forEach(req => renderRequest(req));
+updateCount();
+
+// WebSocket connection for live updates
+const wsUrl = location.origin.replace(/^http/, "ws") + `/ws/${{WEBHOOK_ID}}`;
+const ws = new WebSocket(wsUrl);
+
+ws.onopen = () => {{
+    statusEl.textContent = "Connected";
+    statusEl.className = "text-xs px-2 py-1 rounded bg-green-500 text-white";
+}};
+
+ws.onmessage = (event) => {{
+    try {{
+        const data = JSON.parse(event.data);
+        if (!data || !data.id) return;
+        renderRequest(data, true); // highlight new request
+    }} catch (err) {{
+        console.error("WS parse error:", err);
+    }}
+}};
+
+ws.onclose = () => {{
+    statusEl.textContent = "Disconnected — reconnecting…";
+    statusEl.className = "text-xs px-2 py-1 rounded bg-red-500 text-white";
+    setTimeout(() => location.reload(), 3000);
+}};
+</script>
+</body>
+</html>
+"#,
         id = id,
         requests_json = requests_json
     );
