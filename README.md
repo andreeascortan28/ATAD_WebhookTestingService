@@ -19,12 +19,9 @@ http://localhost:3000
 
 ## Functionalities
 
-### Current:
 * "/new" endpoint to generate unique webhook and save it to database
 * "/webhook/:id" to store webhook temporarily before saving to SQLite Database
 * "/dashboard/:id" endpoint to inspect existing webhooks and all requests made to them 
 * "/ws/:id" to run a websocket in order to update dashboard with new info from Database in real-time
-
-### WIP:
 * "/replay" endpoint to replay a webhook
 * "/webhook/:id/config" endpoint to configure custom responses
