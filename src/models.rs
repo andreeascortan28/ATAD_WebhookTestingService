@@ -67,3 +67,18 @@ impl From<StoredRequest> for WebhookEvent {
         }
     }
 }
+
+impl StoredRequest {
+    #[cfg(test)]
+    pub fn test_fixture(webhook_id: &str) -> Self {
+        Self {
+            id: "test-id".to_string(),
+            webhook_id: webhook_id.to_string(),
+            method: "POST".to_string(),
+            headers: "{}".to_string(),
+            body: "test-body".to_string(),
+            query: "".to_string(),
+            created_at: "2025-01-01T00:00:00Z".to_string(),
+        }
+    }
+}
