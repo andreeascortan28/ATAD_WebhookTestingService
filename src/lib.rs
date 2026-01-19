@@ -19,7 +19,7 @@ impl AppState {
         Ok(())
     }
 
-    pub async fn store_request(&self, req: &crate::models::StoredRequest) -> anyhow::Result<()> {
+    pub async fn store_request(&self, req: &models::StoredRequest) -> anyhow::Result<()> {
         self.db.store_request(req).await?;
         Ok(())
     }
@@ -27,13 +27,13 @@ impl AppState {
     pub async fn get_response_config(
         &self,
         webhook_id: &str,
-    ) -> Result<crate::models::WebhookConfig, sqlx::Error> {
+    ) -> Result<models::WebhookConfig, sqlx::Error> {
         self.db.get_response_config(webhook_id).await
     }
 
     pub async fn set_response_config(
         &self,
-        config: &crate::models::WebhookConfig,
+        config: &models::WebhookConfig,
     ) -> Result<(), sqlx::Error> {
         self.db.set_response_config(config).await
     }

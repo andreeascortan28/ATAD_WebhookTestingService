@@ -1,7 +1,7 @@
 mod common;
 
 use webhook_tester::db::Database;
-use webhook_tester::models::{StoredRequest, WebhookConfig};
+use webhook_tester::models::StoredRequest;
 use sqlx::SqlitePool;
 
 #[tokio::test]

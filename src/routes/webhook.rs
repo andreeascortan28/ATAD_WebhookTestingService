@@ -4,7 +4,7 @@ use axum::{
     Json,
 };
 use axum::body::Bytes;
-use axum::http::{StatusCode, HeaderValue};
+use axum::http::StatusCode;
 use serde::{Deserialize, Serialize};
 use std::{collections::HashMap, sync::Arc};
 use uuid::Uuid;

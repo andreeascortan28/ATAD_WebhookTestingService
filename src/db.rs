@@ -1,4 +1,4 @@
-use sqlx::{SqlitePool, FromRow};
+use sqlx::SqlitePool;
 use anyhow::Result;
 use chrono::Utc;
 use std::{fs::OpenOptions, path::PathBuf};

@@ -7,8 +7,6 @@ use axum::{
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::{broadcast, Mutex};
-use std::pin::Pin;
-use std::future::Future;
 
 use webhook_tester::replay::{replay_request, MOCK_FORWARD_REQUEST};
 use webhook_tester::models::{StoredRequest, WebhookEvent};
