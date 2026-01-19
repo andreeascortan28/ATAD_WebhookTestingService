@@ -1,8 +1,11 @@
 use axum::http::HeaderMap;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 use crate::models::StoredRequest;
 use reqwest::Client;
+use sqlx::SqlitePool;
+use crate::db::Database;
 
 pub fn headers_to_json(headers: &HeaderMap) -> Value {
     let mut map = serde_json::Map::new();
@@ -41,3 +44,27 @@ pub async fn forward_request(forward_url: &str, req: &StoredRequest) -> Result<(
 
     Ok(())
 }
+
+pub async fn new_for_tests() -> Arc<Database> {
+    let pool = SqlitePool::connect(":memory:").await.unwrap();
+
+    sqlx::query(
+        r#"
+        CREATE TABLE requests (
+            id TEXT PRIMARY KEY,
+            webhook_id TEXT NOT NULL,
+            method TEXT NOT NULL,
+            headers TEXT NOT NULL,
+            body TEXT NOT NULL,
+            query TEXT,
+            created_at TEXT NOT NULL
+        )
+        "#,
+    )
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    Arc::new(Database { pool })
+}
+

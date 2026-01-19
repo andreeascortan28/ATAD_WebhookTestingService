@@ -1,7 +1,7 @@
 use axum::{extract::{Path, State}, Json};
 use serde_json::json;
 use reqwest::{Client, header::{HeaderMap, HeaderName, HeaderValue}};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::collections::HashMap;
 
 use crate::{AppState, models::StoredRequest};
@@ -10,6 +10,10 @@ use crate::{AppState, models::StoredRequest};
 pub struct ReplayPayload {
     target: String,
 }
+
+pub type ForwardRequestFn = dyn Fn(&str, &StoredRequest) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), anyhow::Error>> + Send>> + Send + Sync;
+
+pub static MOCK_FORWARD_REQUEST: OnceLock<Box<ForwardRequestFn>> = OnceLock::new();
 
 pub async fn replay_request(
     Path(req_id): Path<String>,
@@ -27,6 +31,14 @@ pub async fn replay_request(
         Ok(req) => req,
         Err(_) => return Json(json!({"error": "Request not found"})),
     };
+
+    // If the mock is set, call it
+    if let Some(mock) = MOCK_FORWARD_REQUEST.get() {
+        if let Err(e) = mock(target_url, &stored_req).await {
+            return Json(json!({"error": e.to_string()}));
+        }
+        return Json(json!({"status": "ok"}));
+    }
 
     // Convert headers JSON string -> HashMap -> HeaderMap
     let mut headers = HeaderMap::new();
