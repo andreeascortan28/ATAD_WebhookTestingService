@@ -25,3 +25,24 @@ http://localhost:3000
 * "/ws/:id" to run a websocket in order to update dashboard with new info from Database in real-time
 * "/replay" endpoint to replay a webhook
 * "/webhook/:id/config" endpoint to configure custom responses
+
+# Project specifications
+
+## User Stories
+
+* As a developer, I can generate a unique webhook URL instantly
+* As a developer, I can see all requests sent to my webhook in real-time
+* As a developer, I can inspect request headers, body, and query parameters
+* As a developer, I can replay a webhook to my actual endpoint
+* As a developer, I can configure custom responses
+
+## Technical Requirements
+
+* Generate unique webhook URLs with UUIDs
+* Capture all HTTP request details
+* Real-time updates via WebSockets
+* Web dashboard for viewing requests
+* Custom response configuration
+* Request forwarding capability
+* Request history storage (24–48 hours)
+* CORS support
